@@ -12,14 +12,25 @@
       <!-- 차량 번호 + 주행거리 조회 -->
       <q-card class="q-mb-lg">
         <q-card-section>
-          <q-input v-model="vin" label="차량 뒷 번호 4자리" outlined dense />
+          <q-input
+            :model-value="vin"
+            label="차량 뒷 번호 4자리"
+            outlined
+            dense
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            input-class="no-spinner"
+            maxlength="4"
+            @update:model-value="handleVinInput"
+          />
 
           <div class="q-mt-md row items-center q-gutter-sm">
             <q-btn
               label="주행거리 불러오기"
               color="primary"
               :loading="loadingMileage"
-              :disable="!vin || loadingMileage"
+              :disable="vin.length !== 4 || loadingMileage"
               @click="onFetchMileage"
             />
             <div v-if="mileage !== null" class="text-caption">
@@ -94,6 +105,7 @@ const $q = useQuasar();
 const vin = ref('');
 const mileage = ref<number | null>(null);
 const loadingMileage = ref(false);
+const prevRaw = ref('');
 
 // 소모품 설정 (주기 km)
 const items = [
@@ -146,6 +158,34 @@ function getStatusText(item: Item): string {
   return '정상';
 }
 
+function handleVinInput(val: string | number | null) {
+  const raw = String(val ?? '');
+
+  // 이번 입력이 "추가"인지, "삭제"인지 판단
+  const isAdding = raw.length > prevRaw.value.length;
+
+  // 1) 숫자만 추출
+  let digits = raw.replace(/\D/g, '');
+
+  // 2) 4자리까지만 허용
+  if (digits.length > 4) {
+    digits = digits.slice(0, 4);
+  }
+
+  // 3) 잘못된 입력에 대한 Toast (추가 입력일 때만)
+  if (isAdding && raw !== digits && raw.length > 0) {
+    $q.notify({
+      type: 'warning',
+      message: '차량 번호는 숫자 4자리만 입력할 수 있습니다.',
+    });
+  }
+
+  // 4) 실제 상태 값은 숫자 4자리 이하만 유지
+  vin.value = digits;
+  prevRaw.value = raw;  // 다음 비교를 위해 원본 문자열 저장
+}
+
+
 // --- 주행거리 불러오기 (차량 번호 바뀔 때마다 다른 값) ---
 async function onFetchMileage() {
   if (!vin.value) return;
@@ -170,3 +210,15 @@ async function onFetchMileage() {
   }
 }
 </script>
+
+<style scoped>
+.no-spinner::-webkit-inner-spin-button,
+.no-spinner::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.no-spinner {
+  -moz-appearance: textfield; /* Firefox */
+}
+</style>
